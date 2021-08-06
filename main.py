@@ -5,7 +5,7 @@ with open('token.txt') as f:
     token = f.read()
 
 bot = telebot.TeleBot(token)
-rating = {'common': [0, 0]}
+rating = {'common': []}
 
 
 @bot.message_handler(content_types=['text'])
@@ -38,7 +38,6 @@ def command(call):
         start(call)
 
 
-
 # функция для оценки поездки
 @bot.message_handler(commands=['start'])
 def rate_trip(message):
@@ -63,16 +62,11 @@ def rate_trip(message):
 @bot.callback_query_handler(func=lambda call: True)
 def calculation_rating(call):
     global rating
-    try:
-        rating['common'][0] = rating['common'][0] + int(call.text)
-        rating['common'][1] += 1
-        try:
-            rating[call.from_user.id][0] = rating[call.from_user.id][0] + int(call.text)
-            rating[call.from_user.id][1] += 1
-        except:
-            rating.update({call.from_user.id: [int(call.text), 1]})
-    except:
-        pass
+    rating['common'].append(int(call.text))
+    if call.from_user.id in rating:
+        rating[call.from_user.id].append(int(call.text))
+    else:
+        rating.update({call.from_user.id: [int(call.text)]})
     start(call)
 
 
@@ -80,10 +74,14 @@ def calculation_rating(call):
 @bot.message_handler(commands=['rating'])
 def send_rating(message):
     global rating
-    try:
-        reply = "Общий рейтинг равен " + str(rating['common'][0] / rating['common'][1]) + '\nВаш рейтинг равен ' + str(
-            rating[message.from_user.id][0] / rating[message.from_user.id][1])
-    except:
+    if rating["common"]:
+        reply = "Общий рейтинг равен " + str(round(sum(rating['common']) / len(rating['common']), 2))
+        if message.from_user.id in rating:
+            reply += '\nВаш рейтинг равен ' + str(
+                round(sum(rating[message.from_user.id]) / len(rating[message.from_user.id]), 2))
+        else:
+            reply += "\nВаш рейтинг отсутствует"
+    else:
         reply = "Рейтинг отсутствует"
     bot.reply_to(message, reply)
 
@@ -97,19 +95,13 @@ def cancel_grade(message):
     keyboard.add(key_1, key_2)
     bot.reply_to(message, 'Вы действительно хотите отменить последнюю оценку?', reply_markup=keyboard)
     bot.register_next_step_handler(message, cancel_grade_func)
-    '''try:
-        reply = "Общий рейтинг равен " + str(rating['common'][0] / rating['common'][1]) + '\nВаш рейтинг равен ' + str(
-            rating[message.from_user.id][0] / rating[message.from_user.id][1])
-    except:
-        reply = "Рейтинг отсутствует"
-    bot.reply_to(message, reply)'''
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def cancel_grade_func(call):
     global rating
-    if call.from_user.id in rating and call.text == "Нет":
-        print(rating)
+    if call.from_user.id in rating and call.text == "Да":
+        rating["common"].remove(rating[call.from_user.id].pop())
     elif call.text == "Да":
         bot.reply_to(call, 'У вас нет оценки')
     start(call)
