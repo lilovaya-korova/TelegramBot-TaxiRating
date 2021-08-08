@@ -2,10 +2,20 @@ import telebot
 from telebot import types
 
 with open('token.txt') as f:
-    token = f.read()
+    token = f.readline().rstrip()
+    chat_id_Nikita = f.readline().rstrip()
 
 bot = telebot.TeleBot(token)
 rating = {'common': []}
+feedback = ""
+
+# Функция для уточнения действий пользователя
+def correcting_answer(message, text):
+    keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    key_1 = types.KeyboardButton('Да')
+    key_2 = types.KeyboardButton('Нет')
+    keyboard.add(key_1, key_2)
+    bot.reply_to(message, 'Вы действительно хотите ' + text + '?', reply_markup=keyboard)
 
 
 @bot.message_handler(content_types=['text'])
@@ -16,12 +26,15 @@ def start(message):
         send_rating(message)
     elif message.text == 'Отменить оценку':
         cancel_grade(message)
+    elif message.text == 'Отправить чаевые/отзыв':
+        post_message(message)
     else:
         keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True)
         key_1 = types.KeyboardButton('Оценить поездку')
         key_2 = types.KeyboardButton('Вывести рейтинг')
         key_3 = types.KeyboardButton('Отменить оценку')
-        keyboard.add(key_1, key_2, key_3)
+        key_4 = types.KeyboardButton('Отправить чаевые/отзыв')
+        keyboard.add(key_1, key_2, key_3, key_4)
         msg = bot.send_message(message.from_user.id, text='Выберите команду', reply_markup=keyboard)
         bot.register_next_step_handler(msg, command)
 
@@ -34,6 +47,8 @@ def command(call):
         send_rating(call)
     elif call.text == 'Отменить оценку':
         cancel_grade(call)
+    elif call.text == 'Отправить чаевые/отзыв':
+        post_message(call)
     else:
         start(call)
 
@@ -86,15 +101,15 @@ def send_rating(message):
     bot.reply_to(message, reply)
 
 
+# отмена поездки
 @bot.message_handler(commands=['cancel'])
 def cancel_grade(message):
     global rating
-    keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    key_1 = types.KeyboardButton('Да')
-    key_2 = types.KeyboardButton('Нет')
-    keyboard.add(key_1, key_2)
-    bot.reply_to(message, 'Вы действительно хотите отменить последнюю оценку?', reply_markup=keyboard)
-    bot.register_next_step_handler(message, cancel_grade_func)
+    if message.from_user.id in rating:
+        correcting_answer(message, 'отменить оценку')
+        bot.register_next_step_handler(message, cancel_grade_func)
+    else:
+        bot.reply_to(message, 'У вас нет оценки')
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -105,6 +120,48 @@ def cancel_grade_func(call):
     elif call.text == "Да":
         bot.reply_to(call, 'У вас нет оценки')
     start(call)
+
+
+# Выбор между чаевыми и отзывом
+@bot.message_handler(commands=['message'])
+def post_message(message):
+    keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    key_1 = types.KeyboardButton('Отзыв')
+    key_2 = types.KeyboardButton('Чаевые')
+    keyboard.add(key_1, key_2)
+    bot.reply_to(message, 'Что вы хотите отправить Никите?', reply_markup=keyboard)
+    bot.register_next_step_handler(message, post_message_func)
+
+
+# Разделение ветки
+@bot.callback_query_handler(func=lambda call: True)
+def post_message_func(message):
+    if message.text == 'Чаевые':
+        text = '💸'
+        bot.send_message(chat_id_Nikita, text)
+        bot.reply_to(message, 'Чаевые отправлены Никите')
+        start(message)
+    else:
+        bot.send_message(message.from_user.id, 'Напишите анонимный отзыв Никите')
+        bot.register_next_step_handler(message, send_feedback)
+
+
+@bot.callback_query_handler(func=lambda call: True) # какой-то костыль, мне кажется, что можно нормально написать
+def send_feedback(message):
+    global feedback
+    feedback = message.text
+    correcting_answer(message, 'отправить этот отзыв')
+    bot.register_next_step_handler(message, send_feedback_func)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def send_feedback_func(message):
+    if message.text == "Да":
+        bot.send_message(chat_id_Nikita, feedback)
+        bot.reply_to(message, '*Отзыв отправлен Никите*', parse_mode= 'Markdown')
+    else:
+        bot.reply_to(message, 'Отзыв не отправлен Никите', parse_mode= 'Markdown')
+    start(message)
 
 
 bot.polling()
