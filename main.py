@@ -9,13 +9,15 @@ bot = telebot.TeleBot(token)
 rating = {'common': []}
 feedback = ""
 
+# -------------------------------- Общие запросы
 # Функция для уточнения действий пользователя
-def correcting_answer(message, text):
+def correcting_answer(message, text, func):
     keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     key_1 = types.KeyboardButton('Да')
     key_2 = types.KeyboardButton('Нет')
     keyboard.add(key_1, key_2)
     bot.reply_to(message, 'Вы действительно хотите ' + text + '?', reply_markup=keyboard)
+    bot.register_next_step_handler(message, func)
 
 
 @bot.message_handler(content_types=['text'])
@@ -53,7 +55,7 @@ def command(call):
         start(call)
 
 
-# функция для оценки поездки
+# --------------------------------  Оценка поездки
 @bot.message_handler(commands=['start'])
 def rate_trip(message):
     question = 'Оцените поездку Никиты'
@@ -73,6 +75,7 @@ def rate_trip(message):
     bot.register_next_step_handler(msg, calculation_rating)
 
 
+# -------------------------------- Рейтинг
 # подсчет рейтинга
 @bot.callback_query_handler(func=lambda call: True)
 def calculation_rating(call):
@@ -101,13 +104,12 @@ def send_rating(message):
     bot.reply_to(message, reply)
 
 
-# отмена поездки
+# -------------------------------- Отмена оценки
 @bot.message_handler(commands=['cancel'])
 def cancel_grade(message):
     global rating
     if message.from_user.id in rating:
-        correcting_answer(message, 'отменить оценку')
-        bot.register_next_step_handler(message, cancel_grade_func)
+        correcting_answer(message, 'отменить оценку', cancel_grade_func)
     else:
         bot.reply_to(message, 'У вас нет оценки')
 
@@ -116,12 +118,14 @@ def cancel_grade(message):
 def cancel_grade_func(call):
     global rating
     if call.from_user.id in rating and call.text == "Да":
-        rating["common"].remove(rating[call.from_user.id].pop())
-    elif call.text == "Да":
-        bot.reply_to(call, 'У вас нет оценки')
+        if rating[call.from_user.id] != []:
+            rating["common"].remove(rating[call.from_user.id].pop())
+        else:
+            bot.reply_to(call, 'У вас нет оценки')
     start(call)
 
 
+# -------------------------------- Чаевые и отзыв
 # Выбор между чаевыми и отзывом
 @bot.message_handler(commands=['message'])
 def post_message(message):
@@ -139,28 +143,28 @@ def post_message_func(message):
     if message.text == 'Чаевые':
         text = '💸'
         bot.send_message(chat_id_Nikita, text)
-        bot.reply_to(message, 'Чаевые отправлены Никите')
+        bot.reply_to(message, '*Чаевые отправлены Никите*', parse_mode='Markdown')
         start(message)
     else:
         bot.send_message(message.from_user.id, 'Напишите анонимный отзыв Никите')
         bot.register_next_step_handler(message, send_feedback)
 
 
-@bot.callback_query_handler(func=lambda call: True) # какой-то костыль, мне кажется, что можно нормально написать
+# Убеждаемся, что отзыв нормальный
+@bot.callback_query_handler(func=lambda call: True)
 def send_feedback(message):
     global feedback
     feedback = message.text
-    correcting_answer(message, 'отправить этот отзыв')
-    bot.register_next_step_handler(message, send_feedback_func)
+    correcting_answer(message, 'отправить этот отзыв', send_feedback_func)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def send_feedback_func(message):
     if message.text == "Да":
         bot.send_message(chat_id_Nikita, feedback)
-        bot.reply_to(message, '*Отзыв отправлен Никите*', parse_mode= 'Markdown')
+        bot.reply_to(message, '*Отзыв отправлен Никите*', parse_mode='Markdown')
     else:
-        bot.reply_to(message, 'Отзыв не отправлен Никите', parse_mode= 'Markdown')
+        bot.reply_to(message, '*Отзыв не отправлен Никите*', parse_mode='Markdown')
     start(message)
 
 
