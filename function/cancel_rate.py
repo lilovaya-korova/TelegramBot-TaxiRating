@@ -1,4 +1,4 @@
-from all.common import *
+from function.common import *
 
 
 @bot.message_handler(regexp="Отменить оценку")

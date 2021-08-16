@@ -1,4 +1,4 @@
-from all.bot import *
+from function.bot import *
 
 
 # Функция для уточнения действий пользователя

@@ -1,4 +1,4 @@
-from all.common import *
+from function.common import *
 
 
 # оценить поездку
