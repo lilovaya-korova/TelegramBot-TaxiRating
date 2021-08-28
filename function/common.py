@@ -1,5 +1,31 @@
 from function.bot import *
 
+st = False
+
+# Провера на наличие пользователя в БД
+def chech_user_in_db(id):
+    global connection
+    query = 'SELECT id_telegram FROM users;'
+    cursor = connection.cursor()
+    cursor.execute(query)
+    row = [i[0] for i in cursor]
+    if id not in row:
+        query = 'INSERT INTO users(id_telegram) VALUES (' + str(id) + ');'
+        cursor.execute(query)
+        connection.commit()
+    cursor.close()
+
+# Вывод общего и конкретного рейтингов
+def view_rating(id):
+    global connection
+    rating = []
+    cursor = connection.cursor()
+    cursor.execute('SELECT count(rate), sum(rate) FROM rating;')
+    rating.append(cursor.fetchall()[0])
+    cursor.execute('SELECT count(rate), sum(rate) FROM rating WHERE id =' + str(id) + ';')
+    rating.append(cursor.fetchall()[0])
+    cursor.close()
+    return rating
 
 # Функция для уточнения действий пользователя
 def correcting_answer(message, text, func):
@@ -13,6 +39,10 @@ def correcting_answer(message, text, func):
 
 @bot.message_handler(commands=['start', 'help'])
 def start(message):
+    global st
+    if not st:
+        chech_user_in_db(message.from_user.id)
+        st = True
     keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True)
     key_1 = types.KeyboardButton('Оценить поездку')
     key_2 = types.KeyboardButton('Вывести рейтинг')

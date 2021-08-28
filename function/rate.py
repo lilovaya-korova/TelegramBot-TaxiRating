@@ -1,6 +1,16 @@
 from function.common import *
 
 
+# добавление оценки в БД
+def add_rate(id, rate):
+    global connection
+    query = 'INSERT INTO rating VALUES (' + str(id) + ',' + str(rate) + ');'
+    cursor = connection.cursor()
+    cursor.execute(query)
+    connection.commit()
+    cursor.close()
+
+
 # оценить поездку
 @bot.message_handler(regexp="Оценить поездку")
 def rate_trip(message):
@@ -25,6 +35,7 @@ def rate_trip(message):
 @bot.callback_query_handler(func=lambda call: True)
 def calculation_rating(call):
     global rating
+    add_rate(call.from_user.id, call.text)
     rating['common'].append(int(call.text))
     if call.from_user.id in rating:
         rating[call.from_user.id].append(int(call.text))

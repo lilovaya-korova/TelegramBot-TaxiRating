@@ -1,7 +1,7 @@
 from function.common import *
 
 
-#выбор между чаевыми и отзывом
+# выбор между чаевыми и отзывом
 @bot.message_handler(regexp="Отправить*")
 def post_message(message):
     keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
